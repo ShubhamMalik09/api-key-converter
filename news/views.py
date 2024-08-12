@@ -1,38 +1,8 @@
-import requests.exceptions
-from .models import News
-from rest_framework.test import APIClient
+import requests.exceptions, requests
+from .middleware import get_current_api_key,deactivate_key
 from django.http import JsonResponse
-import requests
-
-api_key = ""
+import os
 count=5
-
-def activate_all_key():
-    print("activating all keys")
-    for key in News.objects.filter(isActive=False):
-        key.isActive = True
-        key.save()
-
-def get_current_api_key():
-    global api_key
-    global count
-    count+=1
-    if api_key=="":
-        print("Changing api key")
-        key = News.objects.filter(isActive=True).first()
-        if key:
-            count=5
-            api_key=key
-        else:
-            activate_all_key()
-            return False
-        
-def deactivate_key():
-    global api_key
-    new = News.objects.get(key=api_key)
-    new.isActive=False
-    new.save()
-    api_key=""
 
 def searchNews(request):
     global count
@@ -40,11 +10,13 @@ def searchNews(request):
         if request.method == 'GET':
             if(get_current_api_key() is False):
                 return JsonResponse({"message":"No api key found"}, status=409)
+            count+=1
             search = request.GET.get('q', '')
-            api_url= "https://newsapi.org/v2/everything?q={}&apiKey={}".format(search,api_key)
+            api_url= "https://newsapi.org/v2/everything?q={}&apiKey={}".format(search,os.getenv('API_KEY'))
             try:
                 response = requests.get(api_url)
                 if response.status_code == 409 or count%10==0:
+                    count=5
                     deactivate_key()
                     searchNews(request)
                 response.raise_for_status()
